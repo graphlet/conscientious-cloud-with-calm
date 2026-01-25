@@ -1,0 +1,160 @@
+{
+  "$schema": "https://calm.finos.org/release/1.1/meta/calm.json",
+  "unique-id": "azure-webapp-baseline",
+  "name": "Azure Web App Baseline Architecture",
+  "description": "Baseline Azure infrastructure for a Node.js web application deployed on Azure App Service with source control integration from GitHub",
+  "metadata": [
+    {
+      "version": "1.0.0",
+      "created-by": "Infrastructure Team",
+      "environment": "baseline",
+      "cloud-provider": "Azure",
+      "region": "westeurope",
+      "terraform-version": ">= 0.14.9"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "azure-resource-group",
+      "node-type": "system",
+      "name": "Azure Resource Group",
+      "description": "Azure resource group containing all application resources in West Europe region",
+      "metadata": {
+        "location": "westeurope",
+        "naming-pattern": "myResourceGroup-{random}",
+        "terraform-resource": "azurerm_resource_group.rg"
+      }
+    },
+    {
+      "unique-id": "app-service-plan",
+      "node-type": "system",
+      "name": "Linux App Service Plan",
+      "description": "Azure App Service Plan providing hosting infrastructure for web applications",
+      "metadata": {
+        "os-type": "Linux",
+        "sku-name": "F1",
+        "sku-tier": "Free",
+        "location": "westeurope",
+        "naming-pattern": "webapp-asp-{random}",
+        "terraform-resource": "azurerm_service_plan.appserviceplan"
+      }
+    },
+    {
+      "unique-id": "nodejs-webapp",
+      "node-type": "service",
+      "name": "Node.js Web Application",
+      "description": "Linux-based web application running Node.js 24 LTS with HTTPS enforcement and TLS 1.2 minimum security",
+      "interfaces": [
+        {
+          "unique-id": "webapp-url",
+          "url": "https://webapp-{random}.azurewebsites.net"
+        }
+      ],
+      "metadata": {
+        "runtime": "Node.js",
+        "runtime-version": "24-lts",
+        "https-only": true,
+        "minimum-tls-version": "1.2",
+        "always-on": false,
+        "naming-pattern": "webapp-{random}",
+        "terraform-resource": "azurerm_linux_web_app.webapp"
+      },
+      "controls": {
+        "https-enforcement": {
+          "description": "Enforces HTTPS-only access to the web application, rejecting HTTP requests",
+          "requirements": [
+            {
+              "requirement-url": "https://security.azure.com/controls/https-only.json",
+              "config": {
+                "enabled": true,
+                "redirect-http-to-https": true
+              }
+            }
+          ]
+        },
+        "tls-security": {
+          "description": "Enforces minimum TLS 1.2 protocol version for secure communications",
+          "requirements": [
+            {
+              "requirement-url": "https://security.azure.com/controls/tls-minimum.json",
+              "config": {
+                "minimum-version": "1.2",
+                "allowed-versions": [
+                  "1.2",
+                  "1.3"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "github-repository",
+      "node-type": "system",
+      "name": "GitHub Source Repository",
+      "description": "Public GitHub repository containing the Node.js Hello World application source code",
+      "interfaces": [
+        {
+          "unique-id": "repo-url",
+          "url": "https://github.com/Azure-Samples/nodejs-docs-hello-world"
+        }
+      ],
+      "metadata": {
+        "repository": "Azure-Samples/nodejs-docs-hello-world",
+        "branch": "main",
+        "visibility": "public",
+        "integration-type": "manual"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "app-service-plan-in-resource-group",
+      "description": "App Service Plan is deployed within the Azure Resource Group",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "azure-resource-group",
+          "nodes": [
+            "app-service-plan"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "webapp-in-app-service-plan",
+      "description": "Web application is deployed on and managed by the App Service Plan",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "app-service-plan",
+          "nodes": [
+            "nodejs-webapp"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "webapp-to-github",
+      "description": "Web application automatically deploys source code from GitHub repository",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "nodejs-webapp"
+          },
+          "destination": {
+            "node": "github-repository",
+            "interfaces": [
+              "repo-url"
+            ]
+          }
+        }
+      },
+      "protocol": "HTTPS",
+      "metadata": {
+        "integration-mode": "manual",
+        "use-mercurial": false,
+        "terraform-resource": "azurerm_app_service_source_control.sourcecontrol"
+      }
+    }
+  ]
+}
