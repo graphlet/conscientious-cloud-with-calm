@@ -1,0 +1,173 @@
+{
+  "$schema": "https://calm.finos.org/release/1.1/meta/calm.json",
+  "unique-id": "azure-webapp-baseline",
+  "name": "Azure Web App Baseline Architecture",
+  "description": "Baseline Azure infrastructure for a Node.js web application deployed on Azure App Service with comprehensive security controls",
+  "metadata": [
+    {
+      "version": "1.0.0",
+      "created-by": "Infrastructure Team",
+      "environment": "baseline",
+      "cloud-provider": "Azure",
+      "region": "westeurope",
+      "terraform-version": ">= 0.14.9"
+    }
+  ],
+  "controls": {
+    "encryption-in-transit": {
+      "description": "Enforces TLS 1.2+ for all network communications and HTTPS for all endpoints",
+      "requirements": [
+        {
+          "requirement-url": "https://security.azure.com/controls/network-encryption.json",
+          "config": {
+            "minimum-tls-version": "1.2",
+            "allowed-tls-versions": [
+              "1.2",
+              "1.3"
+            ],
+            "enforce-https-only": true,
+            "certificate-management": "Azure-managed"
+          }
+        }
+      ]
+    },
+    "encryption-at-rest": {
+      "description": "Enforces AES-256 encryption for all persistent data storage including databases, storage accounts, and application data",
+      "requirements": [
+        {
+          "requirement-url": "https://security.azure.com/controls/data-encryption.json",
+          "config": {
+            "encryption-algorithm": "AES-256",
+            "key-management-service": "Azure Key Vault",
+            "customer-managed-keys": false,
+            "enforce-on-resource-types": [
+              "Microsoft.Storage/storageAccounts",
+              "Microsoft.Sql/servers",
+              "Microsoft.DBforPostgreSQL/servers",
+              "Microsoft.Web/sites"
+            ],
+            "automatic-key-rotation": true
+          }
+        }
+      ]
+    },
+    "key-management": {
+      "description": "Centralized cryptographic key management using Azure Key Vault with RBAC access control",
+      "requirements": [
+        {
+          "requirement-url": "https://security.azure.com/controls/key-management.json",
+          "config": {
+            "key-vault-required": true,
+            "soft-delete-enabled": true,
+            "purge-protection-enabled": true,
+            "access-control-model": "RBAC",
+            "network-acls-enabled": true
+          }
+        }
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "unique-id": "azure-resource-group",
+      "node-type": "system",
+      "name": "Azure Resource Group",
+      "description": "Azure resource group containing all application resources in West Europe region",
+      "metadata": {
+        "location": "westeurope",
+        "naming-pattern": "myResourceGroup-{random}",
+        "terraform-resource": "azurerm_resource_group.rg"
+      }
+    },
+    {
+      "unique-id": "app-service-plan",
+      "node-type": "system",
+      "name": "Linux App Service Plan",
+      "description": "Azure App Service Plan providing hosting infrastructure for web applications",
+      "metadata": {
+        "os-type": "Linux",
+        "sku-name": "F1",
+        "sku-tier": "Free",
+        "location": "westeurope",
+        "naming-pattern": "webapp-asp-{random}",
+        "terraform-resource": "azurerm_service_plan.appserviceplan"
+      }
+    },
+    {
+      "unique-id": "nodejs-webapp",
+      "node-type": "service",
+      "name": "Node.js Web Application",
+      "description": "Linux-based web application running Node.js 24 LTS with HTTPS enforcement and TLS 1.2 minimum security",
+      "interfaces": [
+        {
+          "unique-id": "webapp-url",
+          "url": "https://webapp-{random}.azurewebsites.net"
+        }
+      ],
+      "metadata": {
+        "runtime": "Node.js",
+        "runtime-version": "24-lts",
+        "https-only": true,
+        "minimum-tls-version": "1.2",
+        "always-on": false,
+        "naming-pattern": "webapp-{random}",
+        "terraform-resource": "azurerm_linux_web_app.webapp"
+      },
+      "controls": {
+        "https-enforcement": {
+          "description": "Enforces HTTPS-only access to the web application, rejecting HTTP requests",
+          "requirements": [
+            {
+              "requirement-url": "https://security.azure.com/controls/https-only.json",
+              "config": {
+                "enabled": true,
+                "redirect-http-to-https": true
+              }
+            }
+          ]
+        },
+        "tls-security": {
+          "description": "Enforces minimum TLS 1.2 protocol version for secure communications",
+          "requirements": [
+            {
+              "requirement-url": "https://security.azure.com/controls/tls-minimum.json",
+              "config": {
+                "minimum-version": "1.2",
+                "allowed-versions": [
+                  "1.2",
+                  "1.3"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "app-service-plan-in-resource-group",
+      "description": "App Service Plan is deployed within the Azure Resource Group",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "azure-resource-group",
+          "nodes": [
+            "app-service-plan"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "webapp-in-app-service-plan",
+      "description": "Web application is deployed on and managed by the App Service Plan",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "app-service-plan",
+          "nodes": [
+            "nodejs-webapp"
+          ]
+        }
+      }
+    }
+  ]
+}
